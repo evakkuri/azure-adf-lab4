@@ -1,0 +1,231 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "shortEnvironment": {
+      "type": "string",
+      "metadata": {
+        "description": "Identifier for deployment environment. Must be exactly 3 letters long. Used for naming convention. E.g. 'dev' or 'prd'"
+      }
+    },
+    "shortDescription": {
+      "type": "string",
+      "metadata": {
+        "description": "Identifier for use case. Used for naming convention."
+      }
+    },
+    "locationName": {
+      "type": "string",
+      "metadata": {
+        "description": "Identifier for deployment location. Used for naming convention."
+      }
+    },
+    "sqlAdminLogin": {
+      "type": "string",
+      "metadata": {
+        "description": "Admin user name to use for SQL Server to be deployed"
+      }
+    },
+    "sqlAdminPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Admin password for SQL Server to be provisioned"
+      }
+    },
+    "dataLakeStoreFirewallRules": {
+      "type": "array",
+      "metadata": {
+        "description": "Firewall rules for Data Lake Store. See Data Lake Store template for example value."
+      }
+    },
+    "dataLakeAnalyticsFirewallRules": {
+      "type": "array",
+      "metadata": {
+        "description": "Firewall rules for Data Lake Analytics account. See Data Lake Analytics template for example value."
+      }
+    },
+    "dataLakeServicePrincipalId": {
+      "type": "string",
+      "metadata": {
+        "description": "Application ID of Service Principal to be used to access the Data Lake Analytics account"
+      }
+    },
+    "dataLakeServicePrincipalKey": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Key of Service Principal to be used to access the Data Lake Analytics account"
+      }
+    }
+  },
+  "variables": {
+    "useCaseBaseUrl": "https://raw.githubusercontent.com/evakkuri/azure-common/master/azure-adf-lab4/",
+    "commonBaseUrl": "https://raw.githubusercontent.com/evakkuri/azure-common/master/azure-common/",
+    "dataLakeStoreFirewallRules": "[parameters('dataLakeStoreFirewallRules')]"
+  },
+  "resources": [
+    {
+      "comments": "Deploy naming convention",
+      "apiVersion": "2017-05-10",
+      "name": "namingConvention",
+      "type": "Microsoft.Resources/deployments",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[concat(variables('commonBaseUrl'), 'common-namingconvention.json')]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "shortEnvironment": {
+            "value": "[parameters('shortEnvironment')]"
+          },
+          "locationName": {
+            "value": "[parameters('locationName')]"
+          },
+          "shortDescription": {
+            "value": "[parameters('shortDescription')]"
+          }
+        }
+      }
+    },
+    {
+      "comments": "Deploy storage account",
+      "name": "storageAccount",
+      "apiVersion": "2017-05-10",
+      "type": "Microsoft.Resources/deployments",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[concat(variables('commonBaseUrl'), 'common-storageaccount.json')]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "resourceName": {
+            "value": "[concat(reference('namingConvention').outputs.namePrefixShort.value, 'asa')]"
+          }
+        }
+      }
+    },
+    {
+      "comments": "Deploy SQL Server",
+      "name": "sqlServer",
+      "apiVersion": "2017-05-10",
+      "type": "Microsoft.Resources/deployments",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[concat(variables('commonBaseUrl'), 'common-sqlserver.json')]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "resourceName": {
+            "value": "[concat(reference('namingConvention').outputs.namePrefixLong.value, 'sqlserv')]"
+          },
+          "sqlAdminLogin": {
+            "value": "[parameters('sqlAdminLogin')]"
+          },
+          "sqlAdminPassword": {
+            "value": "[parameters('sqlAdminPassword')]"
+          }
+        }
+      }
+    },
+    {
+      "comments": "Deploy SQL Database into the SQL Server created previously",
+      "name": "sqlDb",
+      "apiVersion": "2017-05-10",
+      "type": "Microsoft.Resources/deployments",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[concat(variables('commonBaseUrl'), 'common-sqldb.json')]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "resourceName": {
+            "value": "[concat(reference('namingConvention').outputs.namePrefixLong.value, 'sqldb')]"
+          },
+          "serverName": {
+            "value": "[reference('sqlServer').outputs.sqlServerName.value]"
+          }
+        }
+      }
+    },
+    {
+      "comments": "Deploy Azure Data Lake Store required by Data Lake Analytics",
+      "name": "dataLakeStore",
+      "apiVersion": "2017-05-10",
+      "type": "Microsoft.Resources/deployments",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[concat(variables('commonBaseUrl'), 'common-datalakestore.json')]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "resourceName": {
+            "value": "[concat(reference('namingConvention').outputs.namePrefixShort.value, 'adls')]"
+          },
+          "firewallRules": {
+            "value": "[variables('dataLakeStoreFirewallRules')]"
+          }
+        }
+      }
+    },
+    {
+      "comments": "Deploy Azure Data Lake Analytics account",
+      "name": "dataLakeAnalytics",
+      "apiVersion": "2017-05-10",
+      "type": "Microsoft.Resources/deployments",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[concat(variables('commonBaseUrl'), 'common-datalakeanalytics.json')]",
+          "contentVersion": "1.0.0.1"
+        },
+        "parameters": {
+          "resourceName": {
+            "value": "[concat(reference('namingConvention').outputs.namePrefixShort.value, 'adla')]"
+          },
+          "defaultDataLakeStoreName": {
+            "value": "[reference('dataLakeStore').outputs.dataLakeStoreName.value]"
+          },
+          "firewallRules": {
+            "value": "[parameters('dataLakeAnalyticsFirewallRules')]"
+          },
+          "storageAccounts": {
+            "value": [
+              {
+                "name": "[reference('storageAccount').outputs.storageAccountName.value]",
+                "properties": {
+                  "accessKey": "[reference('storageAccount').outputs.storageAccountKey.value]"
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "storageAccountName": {
+      "type": "string",
+      "value": "[reference('storageAccount').outputs.storageAccountName.value]"
+    },
+    "sqlServerName": {
+      "type": "string",
+      "value": "[reference('sqlServer').outputs.sqlServerName.value]"
+    },
+    "sqlDatabaseName": {
+      "type": "string",
+      "value": "[reference('sqlDb').outputs.sqlDatabaseName.value]"
+    },
+    "dataLakeAnalyticsAccountName": {
+      "type": "string",
+      "value": "[reference('dataLakeAnalytics').outputs.dataLakeAnalyticsName.value]"
+    },
+    "dataLakeStoreName": {
+      "type": "string",
+      "value": "[reference('dataLakeStore').outputs.dataLakeStoreName.value]"
+    }
+  }
+}

@@ -1,0 +1,159 @@
+﻿{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "dataFactoryName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of Data Factory where to deploy the dataset"
+      }
+    },
+    "linkedServiceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of Linked Service to use for deploying the dataset"
+      }
+    },
+    "resourceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of dataset"
+      }
+    },
+    "storageContainerName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of container within linked service where the source data is located"
+      }
+    }
+  },
+  "variables": {
+    "datasetName": "[parameters('resourceName')]",
+    "dataPath": "[concat(parameters('storageContainerName'), '/{Year}/{Month}/')]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.dataFactory/datafactories",
+      "name": "[parameters('dataFactoryName')]",
+      "apiVersion": "2015-10-01",
+      "location": "[resourceGroup().location]",
+      "resources": [
+        {
+          "dependsOn": [
+            "[concat('Microsoft.DataFactory/dataFactories/', parameters('dataFactoryName'))]"
+          ],
+          "type": "datasets",
+          "name": "[variables('datasetName')]",
+          "apiVersion": "2015-10-01",
+          "properties": {
+            "structure": [
+              {
+                "name": "log_date",
+                "type": "String"
+              },
+              {
+                "name": "log_time",
+                "type": "String"
+              },
+              {
+                "name": "c_ip",
+                "type": "String"
+              },
+              {
+                "name": "cs_username",
+                "type": "String"
+              },
+              {
+                "name": "s_ip",
+                "type": "String"
+              },
+              {
+                "name": "s_port",
+                "type": "String"
+              },
+              {
+                "name": "cs_method",
+                "type": "String"
+              },
+              {
+                "name": "cs_uri_stem",
+                "type": "String"
+              },
+              {
+                "name": "cs_uri_query",
+                "type": "String"
+              },
+              {
+                "name": "sc_status",
+                "type": "String"
+              },
+              {
+                "name": "sc_bytes",
+                "type": "Int32"
+              },
+              {
+                "name": "cs_bytes",
+                "type": "Int32"
+              },
+              {
+                "name": "time_taken",
+                "type": "Int32"
+              },
+              {
+                "name": "cs_user_agent",
+                "type": "String"
+              },
+              {
+                "name": "cs_referrer",
+                "type": "String"
+              }
+            ],
+            "type": "AzureBlob",
+            "linkedServiceName": "[parameters('linkedServiceName')]",
+            "typeProperties": {
+              "folderPath": "[variables('dataPath')]",
+              "format": {
+                "type": "TextFormat",
+                "columnDelimiter": " "
+              },
+              "partitionedBy": [
+                {
+                  "name": "Year",
+                  "value": {
+                    "type": "DateTime",
+                    "date": "SliceStart",
+                    "format": "yyyy"
+                  }
+                },
+                {
+                  "name": "Month",
+                  "value": {
+                    "type": "DateTime",
+                    "date": "SliceStart",
+                    "format": "MM"
+                  }
+                }
+              ]
+            },
+            "availability": {
+              "frequency": "Month",
+              "interval": 1
+            },
+            "external": true,
+            "policy": {
+              "validation": {
+                "minimumSizeMB": 0.01
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "outputs": {
+    "datasetName": {
+      "type": "string",
+      "value": "[variables('datasetName')]"
+    }
+  }
+}

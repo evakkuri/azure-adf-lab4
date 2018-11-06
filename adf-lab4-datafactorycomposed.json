@@ -1,0 +1,341 @@
+﻿{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "0.0.0.1",
+  "parameters": {
+    "namePrefixLong": {
+      "type": "string",
+      "metadata": {
+        "description": "Prefix to use for component naming; long version with hyphens can be used for all Data Factory resources"
+      }
+    },
+    "storageAccountName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of Storage Account to use for Linked Service"
+      }
+    },
+    "storageContainerName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of Container in Storage Account"
+      }
+    },
+    "storageAccountKey": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Key to Storage Account for Linked Service"
+      }
+    },
+    "sqlServerName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of SQL Server for Linked Service to SQL DB"
+      }
+    },
+    "sqlDatabaseName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of SQL Database for Linked Service to SQL DB"
+      }
+    },
+    "sqlServerUserName": {
+      "type": "string",
+      "metadata": {
+        "description": "User name to use for logging in to SQL Server for Linked Service"
+      }
+    },
+    "sqlServerPassword": {
+      "type": "string",
+      "metadata": {
+        "description": "Password to use for logging in to SQL Server for Linked Service"
+      }
+    },
+    "dataLakeAnalyticsAccountName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of Data Lake Analytics Account to use for data processing"
+      }
+    },
+    "dataLakeServicePrincipalId": {
+      "type": "string",
+      "metadata": {
+        "description": "Id of Service Principal to use for Data Lake components"
+      }
+    },
+    "dataLakeServicePrincipalKey": {
+      "type": "string",
+      "metadata": {
+        "description": "Key for Service Principal to use for Data Lake components"
+      }
+    },
+    "dataLakeStoreName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of Data Lake Store to use for Linked Service"
+      }
+    }
+  },
+  "variables": {
+    "useCaseBaseUrl": "https://raw.githubusercontent.com/evakkuri/azure-common/master/azure-adf-lab4/",
+    "commonBaseUrl": "https://raw.githubusercontent.com/evakkuri/azure-common/master/azure-common/"
+  },
+  "resources": [
+    {
+      "comments": "Deploy Data Factory V1",
+      "name": "dataFactory",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2017-05-10",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[concat(variables('commonBaseUrl'), 'common-datafactory.json')]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "resourceName": {
+            "value": "[concat(parameters('namePrefixLong'), 'adf')]"
+          }  
+        }
+      }
+    },
+    {
+      "comments": "Deploy Linked Service to Storage Account into the Data Factory deployed previously",
+      "name": "linkedServiceStorageAccount",
+      "apiVersion": "2017-05-10",
+      "type": "Microsoft.Resources/deployments",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[concat(variables('commonBaseUrl'), 'common-linkedservice-storage.json')]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "dataFactoryName": {
+            "value": "[reference('dataFactory').outputs.dataFactoryName.value]"
+          },
+          "resourceName": {
+            "value": "[concat(parameters('namePrefixLong'), 'ls-asa')]"
+          },
+          "storageAccountName": {
+            "value": "[parameters('storageAccountName')]"
+          },
+          "storageAccountKey": {
+            "value": "[parameters('storageAccountKey')]"
+          }
+        }
+      }
+    },
+    {
+      "comments": "Deploy Linked Service to SQL Database into the Data Factory deployed previously",
+      "name": "linkedServiceSqlDb",
+      "apiVersion": "2017-05-10",
+      "type": "Microsoft.Resources/deployments",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[concat(variables('commonBaseUrl'), 'common-linkedservice-sqldb.json')]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "dataFactoryName": {
+            "value": "[reference('dataFactory').outputs.dataFactoryName.value]"
+          },
+          "resourceName": {
+            "value": "[concat(parameters('namePrefixLong'), 'ls-sqldb')]"
+          },
+          "sqlServerName": {
+            "value": "[parameters('sqlServerName')]"
+          },
+          "sqlDatabaseName": {
+            "value": "[parameters('sqlDatabaseName')]"
+          },
+          "sqlServerUserName": {
+            "value": "[parameters('sqlServerUserName')]"
+          },
+          "sqlServerPassword": {
+            "value": "[parameters('sqlServerPassword')]"
+          }
+        }
+      }
+    },
+    {
+      "comments": "Deploy Linked Service to Data Lake Analytics account",
+      "name": "linkedServiceAdla",
+      "apiVersion": "2017-05-10",
+      "type": "Microsoft.Resources/deployments",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[concat(variables('commonBaseUrl'), 'common-linkedservice-datalakeanalytics.json')]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "resourceName": {
+            "value": "[concat(parameters('namePrefixLong'), 'ls-adla')]"
+          },
+          "dataFactoryName": {
+            "value": "[reference('dataFactory').outputs.dataFactoryName.value]"
+          },
+          "dataLakeAnalyticsAccountName": {
+            "value": "[parameters('dataLakeAnalyticsAccountName')]"
+          },
+          "servicePrincipalId": {
+            "value": "[parameters('dataLakeServicePrincipalId')]"
+          },
+          "servicePrincipalKey": {
+            "value": "[parameters('dataLakeServicePrincipalKey')]"
+          }
+        }
+      }
+    },
+    {
+      "comments": "Deploy Linked Service to Data Lake Store account",
+      "name": "linkedServiceAdls",
+      "apiVersion": "2017-05-10",
+      "type": "Microsoft.Resources/deployments",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[concat(variables('commonBaseUrl'), 'common-linkedservice-datalakestore.json')]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "resourceName": {
+            "value": "[concat(parameters('namePrefixLong'), 'ls-adls')]"
+          },
+          "dataFactoryName": {
+            "value": "[reference('dataFactory').outputs.dataFactoryName.value]"
+          },
+          "dataLakeStoreName": {
+            "value": "[parameters('dataLakeStoreName')]"
+          },
+          "servicePrincipalId": {
+            "value": "[parameters('dataLakeServicePrincipalId')]"
+          },
+          "servicePrincipalKey": {
+            "value": "[parameters('dataLakeServicePrincipalKey')]"
+          }
+        }
+      }
+    },
+    {
+      "comments": "Deploy Blob storage source dataset definition",
+      "name": "datasetBlob",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2017-05-10",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[concat(variables('useCaseBaseUrl'), 'adf-lab4-dataset-blob.json')]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "resourceName": {
+            "value": "[concat(parameters('namePrefixLong'), 'ds-blob')]"
+          },
+          "dataFactoryName": {
+            "value": "[reference('dataFactory').outputs.dataFactoryName.value]"
+          },
+          "linkedServiceName": {
+            "value": "[reference('linkedServiceStorageAccount').outputs.linkedServiceName.value]"
+          },
+          "storageContainerName": {
+            "value": "[parameters('storageContainerName')]"
+          }
+        }
+      }
+    },
+    {
+      "comments": "Deploy Data Lake Store interim dataset definition",
+      "name": "datasetDataLakeStore",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2017-05-10",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[concat(variables('useCaseBaseUrl'), 'adf-lab4-dataset-adls.json')]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "resourceName": {
+            "value": "[concat(parameters('namePrefixLong'), 'ds-adls')]"
+          },
+          "dataFactoryName": {
+            "value": "[reference('dataFactory').outputs.dataFactoryName.value]"
+          },
+          "linkedServiceName": {
+            "value": "[reference('linkedServiceAdls').outputs.linkedServiceName.value]"
+          }
+        }
+      }
+    },
+    {
+      "comments": "Deploy dataset definition for sink dataset in SQL DB",
+      "name": "datasetSqlDb",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2017-05-10",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[concat(variables('useCaseBaseUrl'), 'adf-lab4-dataset-sqldb.json')]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "resourceName": {
+            "value": "[concat(parameters('namePrefixLong'), 'ds-sqldb')]"
+          },
+          "dataFactoryName": {
+            "value": "[reference('dataFactory').outputs.dataFactoryName.value]"
+          },
+          "linkedServiceName": {
+            "value": "[reference('linkedServiceSqlDb').outputs.linkedServiceName.value]"
+          }
+        }
+      }
+    },
+    {
+      "comments": "Deploy Data Factory pipeline",
+      "name": "pipeline",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2017-05-10",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[concat(variables('useCaseBaseUrl'), 'adf-lab4-pipeline.json')]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "resourceName": {
+            "value": "[concat(parameters('namePrefixLong'), 'pl')]"
+          },
+          "dataFactoryName": {
+            "value": "[reference('dataFactory').outputs.dataFactoryName.value]"
+          },
+          "scriptLinkedServiceName": {
+            "value": "[reference('linkedServiceStorageAccount').outputs.linkedServiceName.value]"
+          },
+          "storageAccountName": {
+            "value": "[parameters('storageAccountName')]"
+          },
+          "storageContainerName": {
+            "value": "[parameters('storageContainerName')]"
+          },
+          "blobDatasetName": {
+            "value": "[reference('datasetBlob').outputs.datasetName.value]"
+          },
+          "adlsDatasetName": {
+            "value": "[reference('datasetDataLakeStore').outputs.datasetName.value]"
+          },
+          "sqlDbDatasetName": {
+            "value": "[reference('datasetSqlDb').outputs.datasetName.value]"
+          },
+          "dataLakeAnalyticsLinkedServiceName": {
+            "value": "[reference('linkedServiceAdla').outputs.linkedServiceName.value]"
+          }
+        }
+      }
+    }
+  ],
+  "outputs": {
+  }
+}

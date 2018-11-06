@@ -1,0 +1,166 @@
+﻿{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "resourceName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the pipeline to be deployed"
+      }
+    },
+    "dataFactoryName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the Data Factory to which to deploy the pipeline"
+      }
+    },
+    "scriptLinkedServiceName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the Linked Service where the Data Lake Analytics script is deployed"
+      }
+    },
+    "storageAccountName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the Storage Account where the source data is stored"
+      }
+    },
+    "storageContainerName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of storage container in Storage Account with target data"
+      }
+    },
+    "blobDatasetName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the source dataset stored in the blob store"
+      }
+    },
+    "adlsDatasetName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the interim dataset stored in the Data Lake Store"
+      }
+    },
+    "sqlDbDatasetName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the sink dataset stored in SQL DB"
+      }
+    },
+    "dataLakeAnalyticsLinkedServiceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of Data Lake Analytics Linked Service to use for computing"
+      }
+    }
+  },
+  "variables": {
+    "pipelineName": "[parameters('resourceName')]",
+    "singleQuote": "'",
+    "logFileParameter": "[ concat( '$$Text.Format(', variables('singleQuote') , 'wasb://', parameters('storageContainerName'), '@' , parameters('storageAccountName') , '.blob.core.windows.net/{0:yyyy}/{1:MM}/log.txt' , variables('singleQuote') , ', SliceStart, SliceStart)' ) ]",
+    "summaryFileParameter": "$$Text.Format('iislogs/summary/{0:yyyy}/{1:MM}/summary.txt', SliceStart, SliceStart)"
+  },
+  "resources": [
+    {
+      "type": "microsoft.datafactory/datafactories",
+      "name": "[parameters('dataFactoryName')]",
+      "apiVersion": "2015-10-01",
+      "location": "[resourceGroup().location]",
+      "resources": [
+        {
+          "dependsOn": [
+            "[concat('Microsoft.DataFactory/dataFactories/', parameters('dataFactoryName'))]"
+          ],
+          "name": "[variables('pipelineName')]",
+          "type": "datapipelines",
+          "apiVersion": "2015-10-01",
+          "properties": {
+            "activities": [
+              {
+                "type": "DataLakeAnalyticsU-SQL",
+                "typeProperties": {
+                  "scriptPath": "[concat(parameters('storageContainerName'),'/SummarizeLogs.usql')]",
+                  "scriptLinkedService": "[parameters('scriptLinkedServiceName')]",
+                  "degreeOfParallelism": 2,
+                  "parameters": {
+                    "log_file": "[variables('logFileParameter')]",
+                    "summary_file": "[variables('summaryFileParameter')]"
+                  }
+                },
+                "inputs": [
+                  {
+                    "name": "[parameters('blobDatasetName')]"
+                  }
+                ],
+                "outputs": [
+                  {
+                    "name": "[parameters('adlsDatasetName')]"
+                  }
+                ],
+                "policy": {
+                  "timeout": "01:00:00",
+                  "concurrency": 2,
+                  "executionPriorityOrder": "OldestFirst",
+                  "retry": 2
+                },
+                "scheduler": {
+                  "frequency": "Month",
+                  "interval": 1
+                },
+                "name": "U-SQL Script to Summarize Logs",
+                "linkedServiceName": "[parameters('dataLakeAnalyticsLinkedServiceName')]"
+              },
+              {
+                "type": "Copy",
+                "typeProperties": {
+                  "source": {
+                    "type": "AzureDataLakeStoreSource",
+                    "recursive": false
+                  },
+                  "sink": {
+                    "type": "SqlSink",
+                    "writeBatchSize": 0,
+                    "writeBatchTimeout": "00:00:00"
+                  },
+                  "translator": {
+                    "type": "TabularTranslator",
+                    "columnMappings": "log_date:log_date,requests:requests,bytes_in:bytes_in,bytes_out:bytes_out"
+                  }
+                },
+                "inputs": [
+                  {
+                    "name": "[parameters('adlsDatasetName')]"
+                  }
+                ],
+                "outputs": [
+                  {
+                    "name": "[parameters('sqlDbDatasetName')]"
+                  }
+                ],
+                "policy": {
+                  "timeout": "01:00:00",
+                  "concurrency": 2,
+                  "executionPriorityOrder": "OldestFirst",
+                  "retry": 2
+                },
+                "scheduler": {
+                  "frequency": "Month",
+                  "interval": 1
+                },
+                "name": "Copy summarized data to SQL"
+              }
+            ],
+            "start": "2016-01-01T00:00:00Z",
+            "end": "2016-06-01T23:59:59Z",
+            "pipelineMode": "Scheduled"
+          }
+        }
+      ]
+    }
+  ],
+  "outputs": {
+  }
+}

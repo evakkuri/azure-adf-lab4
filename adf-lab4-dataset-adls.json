@@ -1,0 +1,103 @@
+﻿{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "dataFactoryName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the Data Factory where to deploy the dataset"
+      }
+    },
+    "resourceName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the dataset to deploy"
+      }
+    },
+    "linkedServiceName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the linked service to use"
+      }
+    }
+  },
+  "variables": {
+    "datasetName": "[parameters('resourceName')]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.dataFactory/datafactories",
+      "name": "[parameters('dataFactoryName')]",
+      "apiVersion": "2015-10-01",
+      "location": "[resourceGroup().location]",
+      "resources": [
+        {
+          "dependsOn": [
+            "[concat('Microsoft.DataFactory/dataFactories/', parameters('dataFactoryName'))]"
+          ],
+          "type": "datasets",
+          "name": "[variables('datasetName')]",
+          "apiVersion": "2015-10-01",
+          "properties": {
+            "structure": [
+              {
+                "name": "log_date",
+                "type": "string"
+              },
+              {
+                "name": "requests",
+                "type": "Int64"
+              },
+              {
+                "name": "bytes_in",
+                "type": "Decimal"
+              },
+              {
+                "name": "bytes_out",
+                "type": "Decimal"
+              }
+            ],
+            "type": "AzureDataLakeStore",
+            "linkedServiceName": "[parameters('linkedServiceName')]",
+            "typeProperties": {
+              "fileName": "summary.txt",
+              "folderPath": "iislogs/summary/{Year}/{Month}",
+              "format": {
+                "type": "TextFormat",
+                "columnDelimiter": ","
+              },
+              "partitionedBy": [
+                {
+                  "name": "Year",
+                  "value": {
+                    "type": "DateTime",
+                    "date": "SliceStart",
+                    "format": "yyyy"
+                  }
+                },
+                {
+                  "name": "Month",
+                  "value": {
+                    "type": "DateTime",
+                    "date": "SliceStart",
+                    "format": "MM"
+                  }
+                }
+              ]
+            },
+            "availability": {
+              "frequency": "Month",
+              "interval": 1
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "outputs": {
+    "datasetName": {
+      "type": "string",
+      "value": "[variables('datasetName')]"
+    }
+  }
+}
